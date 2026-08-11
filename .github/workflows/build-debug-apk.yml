@@ -46,6 +46,14 @@ jobs:
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
 
+    - name: Download Gradle wrapper JAR
+      run: |
+        mkdir -p gradle/wrapper
+        cd gradle/wrapper
+        curl -L https://services.gradle.org/distributions/gradle-8.2-bin.zip -o gradle-8.2-bin.zip
+        unzip -q gradle-8.2-bin.zip
+        cd ../../
+
     - name: Build debug APK
       run: ./gradlew assembleDebug --no-daemon
 
