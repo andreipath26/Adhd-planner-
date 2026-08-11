@@ -15,23 +15,29 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Set up Java
+    - name: Set up Java 17 (for SDK Manager)
+      uses: actions/setup-java@v5
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+
+    - name: Accept Android SDK Licenses
+      run: |
+        mkdir -p $ANDROID_HOME/licenses
+        echo -e "\n24333f8a63b6825ea9c5514f83c2829b004d1fee" > $ANDROID_HOME/licenses/android-sdk-license
+        echo -e "\n504667f4c0de7973335447fc6aaeb57f9a4982e5" > $ANDROID_HOME/licenses/android-sdk-preview-license
+        echo -e "\n8403ad6538eda4133891b6ca8dde43360fdc6b8f" > $ANDROID_HOME/licenses/google-android-sdk-license
+
+    - name: Install Android SDK packages
+      run: |
+        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "platforms;android-36" "build-tools;36.0.0"
+
+    - name: Set up Java 11 (for Gradle build)
       uses: actions/setup-java@v5
       with:
         java-version: '11'
         distribution: 'temurin'
         cache: gradle
-
-    - name: Accept Android SDK Licenses
-      run: |
-        yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
-
-    - name: Install Android SDK packages
-      run: |
-        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
-          "platforms;android-36" \
-          "build-tools;36.0.0" \
-          "cmdline-tools;latest"
 
     - name: Create local.properties
       run: |
