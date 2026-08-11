@@ -1,0 +1,7 @@
+{
+  "name": "FocusFlow",
+  "description": "ADHD planner app featuring customizable dashboard widgets, omni-present brain dump voice/text triage, distraction-free focus mode with notification suppression shield, visual timers, and AI micro-task decomposition.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
