@@ -62,6 +62,7 @@ fun PlannerScreen(
     onDeleteTask: (PlannerTask) -> Unit,
     onAddTaskClick: () -> Unit,
     onOpenSyncClick: () -> Unit,
+    onAiBreakdown: ((PlannerTask) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val dayName = when (selectedDayIndex) {
@@ -181,7 +182,8 @@ fun PlannerScreen(
                                 onStartTimer = { onStartTimer(task) },
                                 onOpenDecomposition = { onOpenDecomposition(task) },
                                 onSetSpotlight = { onSetSpotlight(task) },
-                                onDelete = { onDeleteTask(task) }
+                                onDelete = { onDeleteTask(task) },
+                                onAiBreakdown = { onAiBreakdown?.invoke(task) ?: onOpenDecomposition(task) }
                             )
                         }
                     }

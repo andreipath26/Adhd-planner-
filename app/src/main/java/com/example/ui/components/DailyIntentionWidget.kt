@@ -21,10 +21,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.BatteryChargingFull
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FormatQuote
 import androidx.compose.material.icons.filled.Lightbulb
+import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.SelfImprovement
+import androidx.compose.material.icons.filled.Spa
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -37,9 +40,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.DailyCheckIn
+import com.example.data.model.DailyMicroGoal
 import com.example.data.model.DailyMood
 import com.example.ui.theme.ElegantDarkBorder
 import com.example.ui.theme.ElegantDarkBorderSubtle
@@ -60,6 +65,7 @@ import com.example.ui.theme.EnergyMediumColor
 fun DailyIntentionWidget(
     todayCheckIn: DailyCheckIn?,
     onOpenCheckIn: () -> Unit,
+    onToggleMicroGoal: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     if (todayCheckIn != null) {
@@ -79,6 +85,9 @@ fun DailyIntentionWidget(
             5 -> ElegantLavender // Peak hyperfocus
             else -> EnergyMediumColor
         }
+
+        val microGoals = todayCheckIn.microGoals
+        val completedGoalsCount = microGoals.count { it.isCompleted }
 
         Column(
             modifier = modifier
@@ -206,6 +215,90 @@ fun DailyIntentionWidget(
                                 fontWeight = FontWeight.SemiBold,
                                 color = moodColor
                             )
+                        }
+                    }
+                }
+            }
+
+            // Daily Micro-Goals Section (if present)
+            if (microGoals.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(ElegantDarkSurfaceVariant)
+                        .border(1.dp, ElegantDarkBorderSubtle, RoundedCornerShape(14.dp))
+                        .padding(12.dp)
+                        .testTag("widget_micro_goals_container")
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Spa,
+                                contentDescription = null,
+                                tint = ElegantLavender,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Daily Micro-Habits",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = ElegantTextPrimary
+                            )
+                        }
+
+                        Text(
+                            text = "$completedGoalsCount/${microGoals.size} Done ✨",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = if (completedGoalsCount == microGoals.size) ElegantLavender else ElegantTextSecondary
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        microGoals.forEach { goal ->
+                            val isDone = goal.isCompleted
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(if (isDone) ElegantDarkSurface.copy(alpha = 0.5f) else ElegantDarkSurface)
+                                    .clickable { onToggleMicroGoal?.invoke(goal.id) }
+                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                                    .testTag("widget_microgoal_item_${goal.id}"),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = if (isDone) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+                                    contentDescription = if (isDone) "Completed" else "Incomplete",
+                                    tint = if (isDone) ElegantLavender else ElegantTextMuted,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(text = goal.emoji, fontSize = 13.sp)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = goal.title,
+                                    fontSize = 12.sp,
+                                    fontWeight = if (isDone) FontWeight.Normal else FontWeight.Medium,
+                                    color = if (isDone) ElegantTextMuted else ElegantTextPrimary,
+                                    textDecoration = if (isDone) TextDecoration.LineThrough else TextDecoration.None,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Text(
+                                    text = "${goal.durationMinutes}m",
+                                    fontSize = 10.sp,
+                                    color = ElegantTextSecondary
+                                )
+                            }
                         }
                     }
                 }

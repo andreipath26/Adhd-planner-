@@ -63,12 +63,14 @@ import com.example.ui.components.DashboardCustomizeSheet
 import com.example.ui.components.DecompositionView
 import com.example.ui.components.FocusWhitelistDialog
 import com.example.ui.components.SyncDialog
+import androidx.compose.material.icons.filled.VolunteerActivism
 import com.example.ui.screens.DailyMoodCheckInScreen
 import com.example.ui.screens.DashboardScreen
 import com.example.ui.screens.FocusScreen
 import com.example.ui.screens.PlannerScreen
 import com.example.ui.screens.ProgressScreen
 import com.example.ui.screens.SocialLeaderboardScreen
+import com.example.ui.screens.WelcomeDonationScreen
 import com.example.ui.theme.ElegantDarkBackground
 import com.example.ui.theme.ElegantDarkBorder
 import com.example.ui.theme.ElegantDarkBorderSubtle
@@ -106,6 +108,8 @@ fun MainScreen(viewModel: PlannerViewModel) {
     val timerDurationTotal by viewModel.timerDurationTotal.collectAsState()
     val timerSecondsRemaining by viewModel.timerSecondsRemaining.collectAsState()
     val isTimerRunning by viewModel.isTimerRunning.collectAsState()
+    val showTimerCompletionCue by viewModel.showTimerCompletionCue.collectAsState()
+    val isBreakMode by viewModel.isBreakMode.collectAsState()
     val activeFocusTask by viewModel.activeFocusTask.collectAsState()
     val activeFocusStep by viewModel.activeFocusStep.collectAsState()
     val isFocusModeActive by viewModel.isFocusModeActive.collectAsState()
@@ -134,6 +138,10 @@ fun MainScreen(viewModel: PlannerViewModel) {
     val isRecordingVoice by viewModel.isRecordingVoice.collectAsState()
     val recordedVoiceSeconds by viewModel.recordedVoiceSeconds.collectAsState()
 
+    // Welcome & Donation Landing Page States
+    val showWelcomeLandingScreen by viewModel.showWelcomeLandingScreen.collectAsState()
+    val hasDonated by viewModel.hasDonated.collectAsState()
+
     // Dialog & Sheet States
     val showAddTask by viewModel.showAddTaskDialog.collectAsState()
     val showSync by viewModel.showSyncDialog.collectAsState()
@@ -144,18 +152,6 @@ fun MainScreen(viewModel: PlannerViewModel) {
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val currentDateStr = SimpleDateFormat("EEEE, MMMM d", Locale.getDefault()).format(Date())
-
-    // Daily Mood and Energy Check-in screen on app startup / on demand
-    if (showDailyCheckInScreen) {
-        DailyMoodCheckInScreen(
-            currentCheckIn = todayCheckIn,
-            onSaveCheckIn = { mood, energy, intention, theme, affirmation, strategy ->
-                viewModel.saveDailyCheckIn(mood, energy, intention, theme, affirmation, strategy)
-            },
-            onDismiss = { viewModel.dismissDailyCheckIn() }
-        )
-        return
-    }
 
     // If Distraction-Free Immersion Mode is active: HIDE ALL other interface elements
     // (no top bar, no bottom bar, no affirmations, no tabs) - displaying ONLY the currently selected task and visual timer
@@ -197,7 +193,12 @@ fun MainScreen(viewModel: PlannerViewModel) {
             onOpenProgress = { viewModel.setNavTab(NavTab.PROGRESS) },
             onOpenShieldWhitelist = { viewModel.openFocusWhitelistDialog() },
             onSelectAudioTrack = { viewModel.setFocusAudioTrack(it) },
-            onExitFocusMode = { viewModel.exitFocusMode() }
+            onExitFocusMode = { viewModel.exitFocusMode() },
+            isBreakMode = isBreakMode,
+            showCompletionCue = showTimerCompletionCue,
+            onStartBreak = { viewModel.startBreakTimer(it) },
+            onRepeatSession = { viewModel.resetTimer(); viewModel.startTimer() },
+            onDismissCompletion = { viewModel.dismissTimerCompletion() }
         )
 
         // Shield whitelist modal if opened in immersion
@@ -231,9 +232,11 @@ fun MainScreen(viewModel: PlannerViewModel) {
                 streakDays = userProgress.currentStreak,
                 pendingBrainDumpCount = pendingBrainDumpCount,
                 isShieldActive = isNotificationShieldActive,
+                hasDonated = hasDonated,
                 onStreakClick = { viewModel.setNavTab(NavTab.PROGRESS) },
                 onOpenBrainDump = { viewModel.openBrainDumpQuickSheet() },
-                onOpenShield = { viewModel.openFocusWhitelistDialog() }
+                onOpenShield = { viewModel.openFocusWhitelistDialog() },
+                onOpenDonation = { viewModel.openWelcomeLandingScreen() }
             )
         },
         bottomBar = {
@@ -337,6 +340,8 @@ fun MainScreen(viewModel: PlannerViewModel) {
                         timerDurationTotal = timerDurationTotal,
                         timerSecondsRemaining = timerSecondsRemaining,
                         isTimerRunning = isTimerRunning,
+                        isBreakMode = isBreakMode,
+                        showCompletionCue = showTimerCompletionCue,
                         selectedDay = selectedDay,
                         pendingBrainDumps = pendingBrainDumps,
                         pendingBrainDumpCount = pendingBrainDumpCount,
@@ -346,6 +351,7 @@ fun MainScreen(viewModel: PlannerViewModel) {
                         onAddFiveMinutes = { viewModel.addMinutesToTimer(5) },
                         onTimerPresetSelected = { viewModel.setTimerPreset(it) },
                         onEnterFocusMode = { viewModel.enterFocusMode() },
+                        onStartBreak = { viewModel.startBreakTimer(it) },
                         onOpenCustomizeDashboard = { viewModel.openCustomizeDashboard() },
                         onOpenDailyCheckIn = { viewModel.openDailyCheckIn() },
                         onQuickBrainDump = { text -> viewModel.addBrainDump(text) },
@@ -362,7 +368,12 @@ fun MainScreen(viewModel: PlannerViewModel) {
                             val task = spotlightTask ?: tasksForDay.firstOrNull()
                             task?.let { t -> viewModel.startTimerForTask(t, step) }
                         },
-                        onSelectTask = { viewModel.setSpotlightTask(it) }
+                        onSelectTask = { viewModel.setSpotlightTask(it) },
+                        onToggleMicroGoal = { viewModel.toggleDailyMicroGoal(it) },
+                        isFocusMode = isFocusModeActive,
+                        isNotificationShieldActive = isNotificationShieldActive,
+                        onToggleFocusMode = { viewModel.toggleFocusMode() },
+                        onOpenShieldWhitelist = { viewModel.openFocusWhitelistDialog() }
                     )
                 }
 
@@ -378,7 +389,8 @@ fun MainScreen(viewModel: PlannerViewModel) {
                         onSetSpotlight = { viewModel.setSpotlightTask(it) },
                         onDeleteTask = { viewModel.deleteTask(it) },
                         onAddTaskClick = { viewModel.openAddTaskDialog() },
-                        onOpenSyncClick = { viewModel.openSyncDialog() }
+                        onOpenSyncClick = { viewModel.openSyncDialog() },
+                        onAiBreakdown = { viewModel.decomposeTaskWithAi(it) }
                     )
                 }
 
@@ -420,7 +432,12 @@ fun MainScreen(viewModel: PlannerViewModel) {
                         onOpenProgress = { viewModel.setNavTab(NavTab.PROGRESS) },
                         onOpenShieldWhitelist = { viewModel.openFocusWhitelistDialog() },
                         onSelectAudioTrack = { viewModel.setFocusAudioTrack(it) },
-                        onExitFocusMode = { viewModel.exitFocusMode() }
+                        onExitFocusMode = { viewModel.exitFocusMode() },
+                        isBreakMode = isBreakMode,
+                        showCompletionCue = showTimerCompletionCue,
+                        onStartBreak = { viewModel.startBreakTimer(it) },
+                        onRepeatSession = { viewModel.resetTimer(); viewModel.startTimer() },
+                        onDismissCompletion = { viewModel.dismissTimerCompletion() }
                     )
                 }
 
@@ -583,6 +600,25 @@ fun MainScreen(viewModel: PlannerViewModel) {
             onDismiss = { viewModel.closeSyncDialog() }
         )
     }
+
+    // Daily Mood and Energy Check-in Overlay
+    if (showDailyCheckInScreen) {
+        DailyMoodCheckInScreen(
+            currentCheckIn = todayCheckIn,
+            onSaveCheckIn = { mood, energy, intention, theme, affirmation, strategy, microGoals ->
+                viewModel.saveDailyCheckIn(mood, energy, intention, theme, affirmation, strategy, microGoals)
+            },
+            onDismiss = { viewModel.dismissDailyCheckIn() }
+        )
+    }
+
+    // Welcome & Donation Landing Page Overlay
+    if (showWelcomeLandingScreen) {
+        WelcomeDonationScreen(
+            onDonateSuccess = { amount -> viewModel.handleUserDonation(amount) },
+            onDismiss = { viewModel.dismissWelcomeLandingScreen() }
+        )
+    }
 }
 
 @Composable
@@ -591,9 +627,11 @@ private fun HeaderSection(
     streakDays: Int,
     pendingBrainDumpCount: Int,
     isShieldActive: Boolean,
+    hasDonated: Boolean,
     onStreakClick: () -> Unit,
     onOpenBrainDump: () -> Unit,
-    onOpenShield: () -> Unit
+    onOpenShield: () -> Unit,
+    onOpenDonation: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -667,6 +705,34 @@ private fun HeaderSection(
                             color = ElegantRose
                         )
                     }
+                }
+            }
+
+            // Donation / Supporter Badge
+            Box(
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .background(if (hasDonated) ElegantLavenderDark else ElegantRose.copy(alpha = 0.2f))
+                    .border(1.dp, if (hasDonated) ElegantLavender else ElegantRose, CircleShape)
+                    .clickable { onOpenDonation() }
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                    .testTag("header_donation_btn"),
+                contentAlignment = Alignment.Center
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.VolunteerActivism,
+                        contentDescription = "Support App",
+                        tint = if (hasDonated) ElegantLavender else ElegantRose,
+                        modifier = Modifier.size(15.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = if (hasDonated) "Patron 👑" else "Support ❤️",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (hasDonated) ElegantLavender else ElegantRose
+                    )
                 }
             }
 

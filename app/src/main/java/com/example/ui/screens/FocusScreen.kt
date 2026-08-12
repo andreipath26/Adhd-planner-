@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CenterFocusStrong
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Fullscreen
@@ -53,8 +54,8 @@ import com.example.data.model.PlannerTask
 import com.example.data.model.UserProgress
 import com.example.ui.components.DecompositionView
 import com.example.ui.components.GamificationCard
+import com.example.ui.components.VisualCountdownTimer
 import com.example.ui.components.VisualTimerCard
-import com.example.ui.components.VisualTimerDisk
 import com.example.ui.theme.ElegantDarkBackground
 import com.example.ui.theme.ElegantDarkBorder
 import com.example.ui.theme.ElegantDarkBorderSubtle
@@ -70,6 +71,7 @@ import com.example.ui.theme.ElegantTextPrimary
 import com.example.ui.theme.ElegantTextSecondary
 import com.example.ui.theme.EnergyHighColor
 import com.example.ui.theme.EnergyLowColor
+import java.util.Locale
 
 @Composable
 fun FocusScreen(
@@ -99,6 +101,11 @@ fun FocusScreen(
     onOpenShieldWhitelist: () -> Unit,
     onSelectAudioTrack: (FocusAudioTrack) -> Unit,
     onExitFocusMode: () -> Unit = onToggleDistractionFree,
+    isBreakMode: Boolean = false,
+    showCompletionCue: Boolean = false,
+    onStartBreak: ((Int) -> Unit)? = null,
+    onRepeatSession: (() -> Unit)? = null,
+    onDismissCompletion: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val displayTitle = activeTask?.title ?: "Deep Work Focus Block"
@@ -115,6 +122,8 @@ fun FocusScreen(
             totalSeconds = timerDurationTotal,
             secondsRemaining = timerSecondsRemaining,
             isRunning = isTimerRunning,
+            isBreakMode = isBreakMode,
+            showCompletionCue = showCompletionCue,
             microSteps = effectiveSteps,
             isNotificationShieldActive = isNotificationShieldActive,
             focusAudioTrack = focusAudioTrack,
@@ -124,6 +133,8 @@ fun FocusScreen(
             onToggleStep = onToggleStep,
             onOpenShieldWhitelist = onOpenShieldWhitelist,
             onSelectAudioTrack = onSelectAudioTrack,
+            onStartBreak = onStartBreak,
+            onRepeatSession = onRepeatSession,
             onExitImmersion = onToggleDistractionFree,
             modifier = modifier
         )
@@ -177,7 +188,7 @@ fun FocusScreen(
                                 }
                             }
                             Text(
-                                text = "Cognitive load reduction • Distraction suppression",
+                                text = "Cognitive load reduction • Visual countdown pacing",
                                 fontSize = 12.sp,
                                 color = ElegantTextSecondary
                             )
@@ -236,7 +247,11 @@ fun FocusScreen(
                         onReset = onResetTimer,
                         onAddFiveMinutes = onAddFiveMinutes,
                         onPresetSelected = onPresetSelected,
-                        onToggleDistractionFree = onToggleDistractionFree
+                        onToggleDistractionFree = onToggleDistractionFree,
+                        isBreakMode = isBreakMode,
+                        showCompletionCue = showCompletionCue || (timerSecondsRemaining <= 0 && timerDurationTotal > 0),
+                        onStartBreak = onStartBreak,
+                        onDismissCompletion = onDismissCompletion
                     )
                 }
 
@@ -340,10 +355,10 @@ fun FocusScreen(
  * Distraction-Free Immersion Mode Composable
  * When activated, hides all distracting interface chrome, displaying ONLY:
  * 1. The currently selected task & active micro-step
- * 2. An uninterrupted visual timer
+ * 2. An uninterrupted circular visual countdown timer
  * 3. Notification suppression shield indicator & VIP whitelist settings trigger
  * 4. Ambient soundscape controls
- * 5. Immediate micro-step checklist
+ * 5. Visual completion cues upon expiration
  */
 @Composable
 private fun DistractionFreeImmersionView(
@@ -362,15 +377,13 @@ private fun DistractionFreeImmersionView(
     onOpenShieldWhitelist: () -> Unit,
     onSelectAudioTrack: (FocusAudioTrack) -> Unit,
     onExitImmersion: () -> Unit,
+    isBreakMode: Boolean = false,
+    showCompletionCue: Boolean = false,
+    onStartBreak: ((Int) -> Unit)? = null,
+    onRepeatSession: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    val progressRatio = if (totalSeconds > 0) {
-        1.0f - (secondsRemaining.toFloat() / totalSeconds.toFloat()).coerceIn(0f, 1f)
-    } else 0f
-
-    val minutes = secondsRemaining / 60
-    val seconds = secondsRemaining % 60
-    val formattedTime = String.format("%02d:%02d", minutes, seconds)
+    val isCompleted = (secondsRemaining <= 0 && totalSeconds > 0) || showCompletionCue
 
     Column(
         modifier = modifier
@@ -381,7 +394,7 @@ private fun DistractionFreeImmersionView(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween
     ) {
-        // Top Bar: Shield Badge, Audio Track, Exit Button
+        // Top Bar: Shield Badge, Exit Button
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -432,9 +445,9 @@ private fun DistractionFreeImmersionView(
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
-        // Center Content: Task Title, Phase, Large Visual Timer Disk, Digital Countdown
+        // Center Content: Task Title, Phase, Large Visual Countdown Timer
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.fillMaxWidth()
@@ -443,15 +456,29 @@ private fun DistractionFreeImmersionView(
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(12.dp))
-                    .background(ElegantLavenderContainer)
+                    .background(
+                        when {
+                            isCompleted -> EnergyLowColor.copy(alpha = 0.2f)
+                            isBreakMode -> EnergyLowColor.copy(alpha = 0.2f)
+                            else -> ElegantLavenderContainer
+                        }
+                    )
                     .padding(horizontal = 14.dp, vertical = 4.dp)
             ) {
                 Text(
-                    text = "🎯 CURRENT FOCUS",
+                    text = when {
+                        isCompleted -> "🎉 TIME'S UP"
+                        isBreakMode -> "☕ REFRESH BREAK"
+                        else -> "🎯 CURRENT FOCUS"
+                    },
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 1.5.sp,
-                    color = ElegantLavenderDeepest
+                    color = when {
+                        isCompleted -> EnergyLowColor
+                        isBreakMode -> EnergyLowColor
+                        else -> ElegantLavenderDeepest
+                    }
                 )
             }
 
@@ -469,42 +496,72 @@ private fun DistractionFreeImmersionView(
             Text(
                 text = displayPhase,
                 fontSize = 13.sp,
-                color = ElegantRose,
+                color = if (isCompleted) EnergyLowColor else ElegantRose,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(top = 4.dp)
             )
 
-            Spacer(modifier = Modifier.height(28.dp))
-
-            // Prominent Visual Timer Disk
-            Box(
-                modifier = Modifier.size(240.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                VisualTimerDisk(
-                    progress = progressRatio,
-                    modifier = Modifier.size(240.dp)
-                )
-
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = formattedTime,
-                        fontSize = 44.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = ElegantTextPrimary,
-                        letterSpacing = 2.sp
-                    )
-                    Text(
-                        text = if (isRunning) "FOCUSING" else "PAUSED",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 2.sp,
-                        color = if (isRunning) ElegantLavender else ElegantTextMuted
-                    )
-                }
-            }
-
             Spacer(modifier = Modifier.height(24.dp))
+
+            // Prominent Visual Countdown Timer with Circular Progress Indicator
+            VisualCountdownTimer(
+                totalSeconds = totalSeconds,
+                secondsRemaining = secondsRemaining,
+                isRunning = isRunning,
+                isBreakMode = isBreakMode,
+                showCompletionCue = isCompleted,
+                size = 230.dp,
+                strokeWidth = 11.dp,
+                modifier = Modifier.clickable { onTogglePlayPause() }
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Expiration celebratory banner in immersion mode
+            if (isCompleted) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth(0.9f)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(EnergyLowColor.copy(alpha = 0.15f))
+                        .border(1.dp, EnergyLowColor.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+                        .padding(12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "Focus Sprint Complete! +25 XP 🎉",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = EnergyLowColor
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(EnergyLowColor)
+                                .clickable { onStartBreak?.invoke(5) }
+                                .padding(horizontal = 14.dp, vertical = 6.dp)
+                        ) {
+                            Text("5m Break ☕", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = ElegantDarkBackground)
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .border(1.dp, ElegantLavender, RoundedCornerShape(8.dp))
+                                .clickable { onRepeatSession?.invoke() ?: onReset() }
+                                .padding(horizontal = 14.dp, vertical = 6.dp)
+                        ) {
+                            Text("Repeat 🔁", fontSize = 11.sp, color = ElegantLavender)
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+            }
 
             // Uninterrupted Controls: Play/Pause, +5m, Reset
             Row(
@@ -531,13 +588,24 @@ private fun DistractionFreeImmersionView(
                     modifier = Modifier
                         .size(64.dp)
                         .clip(CircleShape)
-                        .background(if (isRunning) ElegantRose else ElegantLavender)
+                        .background(
+                            when {
+                                isCompleted -> EnergyLowColor
+                                isBreakMode -> EnergyLowColor
+                                isRunning -> ElegantRose
+                                else -> ElegantLavender
+                            }
+                        )
                         .clickable { onTogglePlayPause() }
                         .testTag("immersion_play_pause_btn"),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = if (isRunning) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        imageVector = when {
+                            isRunning -> Icons.Default.Pause
+                            isCompleted -> Icons.Default.Refresh
+                            else -> Icons.Default.PlayArrow
+                        },
                         contentDescription = if (isRunning) "Pause" else "Play",
                         tint = ElegantDarkSurface,
                         modifier = Modifier.size(32.dp)

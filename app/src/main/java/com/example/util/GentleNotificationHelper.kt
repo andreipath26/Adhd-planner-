@@ -60,8 +60,8 @@ object GentleNotificationHelper {
         val manager = context.getSystemService(NotificationManager::class.java)
         try {
             manager?.notify((System.currentTimeMillis() % 10000).toInt(), notification)
-        } catch (e: SecurityException) {
-            // Permission might be denied in runtime, handled safely
+        } catch (e: Throwable) {
+            // Permission or system failure safely caught
         }
     }
 

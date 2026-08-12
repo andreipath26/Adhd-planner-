@@ -92,53 +92,56 @@ data class DailyMicroGoal(
     val id: String = java.util.UUID.randomUUID().toString(),
     val title: String,
     val emoji: String = "✨",
+    val durationMinutes: Int = 5,
     val isCompleted: Boolean = false,
     val completedAt: Long? = null
 )
 
 object DefaultMicroGoals {
     val presets = listOf(
-        DailyMicroGoal(title = "Meditate for 5 mins", emoji = "🧘"),
-        DailyMicroGoal(title = "Drink a large glass of water", emoji = "💧"),
-        DailyMicroGoal(title = "10-minute fresh air walk", emoji = "🚶"),
-        DailyMicroGoal(title = "3 deep physiological sigh breaths", emoji = "🫁"),
-        DailyMicroGoal(title = "10 mins of morning sunlight", emoji = "☀️"),
-        DailyMicroGoal(title = "30-min phone-free morning block", emoji = "📵"),
-        DailyMicroGoal(title = "5-min neck & shoulder desk stretch", emoji = "🙆"),
-        DailyMicroGoal(title = "Savor tea/coffee screen-free", emoji = "☕"),
-        DailyMicroGoal(title = "Quick 2-min brain release dump", emoji = "📝")
+        DailyMicroGoal(title = "Meditate for 5 mins", emoji = "🧘", durationMinutes = 5),
+        DailyMicroGoal(title = "Drink a large glass of water", emoji = "💧", durationMinutes = 2),
+        DailyMicroGoal(title = "10-minute fresh air walk", emoji = "🚶", durationMinutes = 10),
+        DailyMicroGoal(title = "3 deep physiological sigh breaths", emoji = "🫁", durationMinutes = 2),
+        DailyMicroGoal(title = "10 mins of morning sunlight", emoji = "☀️", durationMinutes = 10),
+        DailyMicroGoal(title = "30-min phone-free morning block", emoji = "📵", durationMinutes = 30),
+        DailyMicroGoal(title = "5-min neck & shoulder desk stretch", emoji = "🙆", durationMinutes = 5),
+        DailyMicroGoal(title = "Savor tea/coffee screen-free", emoji = "☕", durationMinutes = 5),
+        DailyMicroGoal(title = "Quick 2-min brain release dump", emoji = "📝", durationMinutes = 2)
     )
+
+    val allPresets = presets
 
     fun forMood(mood: DailyMood): List<DailyMicroGoal> = when (mood) {
         DailyMood.ENERGIZED -> listOf(
-            DailyMicroGoal(title = "15-minute brisk walk outside", emoji = "🚶"),
-            DailyMicroGoal(title = "30-min phone-free morning block", emoji = "📵"),
-            DailyMicroGoal(title = "Drink 1L of water before noon", emoji = "💧")
+            DailyMicroGoal(title = "15-minute brisk walk outside", emoji = "🚶", durationMinutes = 15),
+            DailyMicroGoal(title = "30-min phone-free morning block", emoji = "📵", durationMinutes = 30),
+            DailyMicroGoal(title = "Drink 1L of water before noon", emoji = "💧", durationMinutes = 2)
         )
         DailyMood.CALM -> listOf(
-            DailyMicroGoal(title = "Meditate for 5 mins", emoji = "🧘"),
-            DailyMicroGoal(title = "Hydrate with a tall glass of water", emoji = "💧"),
-            DailyMicroGoal(title = "Savor tea/coffee screen-free", emoji = "☕")
+            DailyMicroGoal(title = "Meditate for 5 mins", emoji = "🧘", durationMinutes = 5),
+            DailyMicroGoal(title = "Hydrate with a tall glass of water", emoji = "💧", durationMinutes = 2),
+            DailyMicroGoal(title = "Savor tea/coffee screen-free", emoji = "☕", durationMinutes = 5)
         )
         DailyMood.FOCUSED -> listOf(
-            DailyMicroGoal(title = "Put phone in another room during focus", emoji = "📵"),
-            DailyMicroGoal(title = "2-min box breathing reset", emoji = "🫁"),
-            DailyMicroGoal(title = "Keep water bottle on desk", emoji = "💧")
+            DailyMicroGoal(title = "Put phone in another room during focus", emoji = "📵", durationMinutes = 25),
+            DailyMicroGoal(title = "2-min box breathing reset", emoji = "🫁", durationMinutes = 2),
+            DailyMicroGoal(title = "Keep water bottle on desk", emoji = "💧", durationMinutes = 2)
         )
         DailyMood.SCATTERED -> listOf(
-            DailyMicroGoal(title = "3 deep physiological sighs", emoji = "🫁"),
-            DailyMicroGoal(title = "Meditate for 5 mins", emoji = "🧘"),
-            DailyMicroGoal(title = "5-min desk stretch & posture reset", emoji = "🙆")
+            DailyMicroGoal(title = "3 deep physiological sighs", emoji = "🫁", durationMinutes = 2),
+            DailyMicroGoal(title = "Meditate for 5 mins", emoji = "🧘", durationMinutes = 5),
+            DailyMicroGoal(title = "5-min desk stretch & posture reset", emoji = "🙆", durationMinutes = 5)
         )
         DailyMood.FATIGUED -> listOf(
-            DailyMicroGoal(title = "Drink a tall cold glass of water", emoji = "💧"),
-            DailyMicroGoal(title = "10 mins of morning sunlight", emoji = "☀️"),
-            DailyMicroGoal(title = "10-minute quiet eye rest break", emoji = "🛋️")
+            DailyMicroGoal(title = "Drink a tall cold glass of water", emoji = "💧", durationMinutes = 2),
+            DailyMicroGoal(title = "10 mins of morning sunlight", emoji = "☀️", durationMinutes = 10),
+            DailyMicroGoal(title = "10-minute quiet eye rest break", emoji = "🛋️", durationMinutes = 10)
         )
         DailyMood.OVERWHELMED -> listOf(
-            DailyMicroGoal(title = "3 deep physiological sigh breaths", emoji = "🫁"),
-            DailyMicroGoal(title = "Meditate for 5 mins", emoji = "🧘"),
-            DailyMicroGoal(title = "Quick 2-min brain release dump", emoji = "📝")
+            DailyMicroGoal(title = "3 deep physiological sigh breaths", emoji = "🫁", durationMinutes = 2),
+            DailyMicroGoal(title = "Meditate for 5 mins", emoji = "🧘", durationMinutes = 5),
+            DailyMicroGoal(title = "Quick 2-min brain release dump", emoji = "📝", durationMinutes = 2)
         )
     }
 }

@@ -23,14 +23,19 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.BatteryAlert
 import androidx.compose.material.icons.filled.BatteryChargingFull
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Lightbulb
+import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.SelfImprovement
+import androidx.compose.material.icons.filled.Spa
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -60,7 +65,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.DailyCheckIn
+import com.example.data.model.DailyMicroGoal
 import com.example.data.model.DailyMood
+import com.example.data.model.DefaultMicroGoals
 import com.example.ui.theme.ElegantDarkBackground
 import com.example.ui.theme.ElegantDarkBorder
 import com.example.ui.theme.ElegantDarkBorderSubtle
@@ -85,7 +92,7 @@ import java.util.Locale
 @Composable
 fun DailyMoodCheckInScreen(
     currentCheckIn: DailyCheckIn?,
-    onSaveCheckIn: (DailyMood, Int, String, String, String, String) -> Unit,
+    onSaveCheckIn: (DailyMood, Int, String, String, String, String, List<DailyMicroGoal>) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -97,6 +104,19 @@ fun DailyMoodCheckInScreen(
     var selectedTheme by remember {
         mutableStateOf(currentCheckIn?.focusTheme ?: "Single-tasking")
     }
+
+    var selectedMicroGoals by remember {
+        mutableStateOf(
+            if (currentCheckIn?.microGoals != null && currentCheckIn.microGoals.isNotEmpty()) {
+                currentCheckIn.microGoals
+            } else {
+                DefaultMicroGoals.forMood(selectedMood)
+            }
+        )
+    }
+    var customGoalTitle by remember { mutableStateOf("") }
+    var customGoalMinutes by remember { mutableIntStateOf(5) }
+    var customGoalEmoji by remember { mutableStateOf("🧘") }
 
     val selectedMoodColor = try {
         Color(android.graphics.Color.parseColor(selectedMood.colorHex))
@@ -512,7 +532,213 @@ fun DailyMoodCheckInScreen(
                     }
                 }
 
-                // Section 4: Tailored ADHD Strategy & Affirmation Preview
+                // Section 4: Non-Task Daily Micro-Goals & Mindful Habits
+                item {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(ElegantDarkSurface)
+                            .border(1.dp, ElegantDarkBorderSubtle, RoundedCornerShape(20.dp))
+                            .padding(16.dp)
+                            .testTag("daily_micro_goals_section")
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(text = "4", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = ElegantLavender)
+                                Text(
+                                    text = "Daily Micro-Goals & Self-Care",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = ElegantTextPrimary
+                                )
+                            }
+
+                            Text(
+                                text = "${selectedMicroGoals.size} active",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = ElegantLavender
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Small, non-task daily habits (1–10 min) to regulate dopamine and ground focus.",
+                            fontSize = 12.sp,
+                            color = ElegantTextSecondary,
+                            lineHeight = 16.sp
+                        )
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Currently selected micro-goals list
+                        if (selectedMicroGoals.isNotEmpty()) {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                selectedMicroGoals.forEach { goal ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(ElegantDarkSurfaceVariant)
+                                            .border(1.dp, if (goal.isCompleted) ElegantLavender.copy(alpha = 0.4f) else Color.Transparent, RoundedCornerShape(12.dp))
+                                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text(text = goal.emoji, fontSize = 16.sp)
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Column {
+                                                Text(
+                                                    text = goal.title,
+                                                    fontSize = 13.sp,
+                                                    fontWeight = FontWeight.Medium,
+                                                    color = ElegantTextPrimary
+                                                )
+                                                Text(
+                                                    text = "${goal.durationMinutes} mins • +15 XP",
+                                                    fontSize = 11.sp,
+                                                    color = ElegantLavender
+                                                )
+                                            }
+                                        }
+
+                                        IconButton(
+                                            onClick = {
+                                                selectedMicroGoals = selectedMicroGoals.filter { it.id != goal.id }
+                                            },
+                                            modifier = Modifier.size(28.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.DeleteOutline,
+                                                contentDescription = "Remove Micro-Goal",
+                                                tint = ElegantTextMuted,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(12.dp))
+                        }
+
+                        // Quick Preset Chips to add
+                        Text(
+                            text = "Tap to add mindful presets:",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = ElegantTextSecondary
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        val availablePresets: List<DailyMicroGoal> = DefaultMicroGoals.allPresets.filter { preset ->
+                            selectedMicroGoals.none { it.title.equals(preset.title, ignoreCase = true) }
+                        }
+
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            for (preset in availablePresets.take(6)) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(ElegantDarkSurfaceVariant)
+                                        .border(1.dp, ElegantDarkBorderSubtle, RoundedCornerShape(10.dp))
+                                        .clickable {
+                                            selectedMicroGoals = selectedMicroGoals + preset.copy(
+                                                id = "goal_${System.currentTimeMillis()}_${(100..999).random()}"
+                                            )
+                                        }
+                                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                                        .testTag("preset_microgoal_${preset.title.take(10).replace(" ", "_")}"),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(text = preset.emoji, fontSize = 12.sp)
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = "+ ${preset.title}",
+                                            fontSize = 11.sp,
+                                            color = ElegantTextPrimary
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Custom Micro-Goal Input
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedTextField(
+                                value = customGoalTitle,
+                                onValueChange = { customGoalTitle = it },
+                                placeholder = { Text("e.g. Meditate for 5 mins", fontSize = 12.sp, color = ElegantTextMuted) },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("custom_microgoal_input"),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = ElegantLavender,
+                                    unfocusedBorderColor = ElegantDarkBorder,
+                                    focusedTextColor = ElegantTextPrimary,
+                                    unfocusedTextColor = ElegantTextPrimary,
+                                    focusedContainerColor = ElegantDarkSurfaceVariant,
+                                    unfocusedContainerColor = ElegantDarkSurfaceVariant
+                                ),
+                                shape = RoundedCornerShape(12.dp),
+                                singleLine = true
+                            )
+
+                            Button(
+                                onClick = {
+                                    if (customGoalTitle.isNotBlank()) {
+                                        val newGoal = DailyMicroGoal(
+                                            id = "custom_${System.currentTimeMillis()}",
+                                            title = customGoalTitle.trim(),
+                                            durationMinutes = customGoalMinutes,
+                                            emoji = customGoalEmoji,
+                                            isCompleted = false
+                                        )
+                                        selectedMicroGoals = selectedMicroGoals + newGoal
+                                        customGoalTitle = ""
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = ElegantLavenderContainer,
+                                    contentColor = ElegantLavenderDeepest
+                                ),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier
+                                    .height(48.dp)
+                                    .testTag("add_custom_microgoal_btn")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Add,
+                                    contentDescription = "Add Goal",
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Section 5: Tailored ADHD Strategy & Affirmation Preview
                 item {
                     Column(
                         modifier = Modifier
@@ -595,7 +821,8 @@ fun DailyMoodCheckInScreen(
                             intentionText.ifBlank { "Protect my focus and flow smoothly" },
                             selectedTheme,
                             mindfulAffirmation,
-                            dynamicStrategy
+                            dynamicStrategy,
+                            selectedMicroGoals
                         )
                     },
                     modifier = Modifier

@@ -9,6 +9,7 @@ import com.example.data.model.AchievementBadge
 import com.example.data.model.BrainDumpItem
 import com.example.data.model.BrainDumpStatus
 import com.example.data.model.DailyCheckIn
+import com.example.data.model.DailyMicroGoal
 import com.example.data.model.DailyMood
 import com.example.data.model.DashboardWidgetConfig
 import com.example.data.model.DashboardWidgetType
@@ -135,6 +136,12 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
     private val _isTimerRunning = MutableStateFlow(false)
     val isTimerRunning: StateFlow<Boolean> = _isTimerRunning.asStateFlow()
 
+    private val _showTimerCompletionCue = MutableStateFlow(false)
+    val showTimerCompletionCue: StateFlow<Boolean> = _showTimerCompletionCue.asStateFlow()
+
+    private val _isBreakMode = MutableStateFlow(false)
+    val isBreakMode: StateFlow<Boolean> = _isBreakMode.asStateFlow()
+
     private val _activeFocusTask = MutableStateFlow<PlannerTask?>(null)
     val activeFocusTask: StateFlow<PlannerTask?> = _activeFocusTask.asStateFlow()
 
@@ -224,24 +231,78 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
     private val _recordedVoiceSeconds = MutableStateFlow(0)
     val recordedVoiceSeconds: StateFlow<Int> = _recordedVoiceSeconds.asStateFlow()
 
+    // --- Welcome & Donation Landing Page State ---
+    private val prefs by lazy {
+        getApplication<Application>().getSharedPreferences("focusflow_app_prefs", Context.MODE_PRIVATE)
+    }
+
+    private val _hasDonated = MutableStateFlow(false)
+    val hasDonated: StateFlow<Boolean> = _hasDonated.asStateFlow()
+
+    private val _showWelcomeLandingScreen = MutableStateFlow(false)
+    val showWelcomeLandingScreen: StateFlow<Boolean> = _showWelcomeLandingScreen.asStateFlow()
+
     private var voiceTimerJob: Job? = null
     private var timerJob: Job? = null
 
     init {
-        // Check if user has completed daily check-in on startup
+        // Ensure database has seed data if empty
         viewModelScope.launch {
-            delay(400)
-            val checkInToday = repository.getTodayCheckInSync(getTodayDateString())
-            if (checkInToday == null) {
-                _showDailyCheckInScreen.value = true
+            try {
+                if (repository.getUserProgressSync() == null) {
+                    db.populateInitialSeedData()
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
         }
 
+        // Check Welcome / Donation Landing page condition (3-day interval unless donated)
+        checkWelcomeLandingCondition()
+
         // Trigger initial gentle reminder check
         viewModelScope.launch {
-            delay(1500)
-            _gentleAffirmation.value = GentleNotificationHelper.getRandomAffirmation()
+            try {
+                delay(1500)
+                _gentleAffirmation.value = GentleNotificationHelper.getRandomAffirmation()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
+    }
+
+    fun checkWelcomeLandingCondition() {
+        val donated = prefs.getBoolean("has_donated", false)
+        _hasDonated.value = donated
+        if (donated) {
+            _showWelcomeLandingScreen.value = false
+            return
+        }
+
+        val lastShowTime = prefs.getLong("last_welcome_show_timestamp", 0L)
+        val currentTime = System.currentTimeMillis()
+        val threeDaysMs = 3L * 24 * 60 * 60 * 1000L // 3 days in ms
+
+        if (lastShowTime == 0L || (currentTime - lastShowTime) >= threeDaysMs) {
+            _showWelcomeLandingScreen.value = true
+            prefs.edit().putLong("last_welcome_show_timestamp", currentTime).apply()
+        } else {
+            _showWelcomeLandingScreen.value = false
+        }
+    }
+
+    fun handleUserDonation(amount: String) {
+        prefs.edit().putBoolean("has_donated", true).apply()
+        _hasDonated.value = true
+        _showWelcomeLandingScreen.value = false
+    }
+
+    fun dismissWelcomeLandingScreen() {
+        _showWelcomeLandingScreen.value = false
+    }
+
+    fun openWelcomeLandingScreen() {
+        _showWelcomeLandingScreen.value = true
     }
 
     fun getTodayDateString(): String {
@@ -262,7 +323,8 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
         intention: String,
         theme: String,
         affirmation: String,
-        strategy: String
+        strategy: String,
+        microGoals: List<DailyMicroGoal> = emptyList()
     ) {
         viewModelScope.launch {
             val checkIn = DailyCheckIn(
@@ -273,6 +335,7 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
                 focusTheme = theme,
                 mindfulAffirmation = affirmation,
                 recommendedStrategy = strategy,
+                microGoals = microGoals,
                 completedAt = System.currentTimeMillis()
             )
             repository.saveDailyCheckIn(checkIn)
@@ -283,6 +346,16 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
                 "Intention Locked In 🌟",
                 "Today's Mindset: ${mood.title} • $intention"
             )
+        }
+    }
+
+    fun toggleDailyMicroGoal(goalId: String) {
+        viewModelScope.launch {
+            val isDone = repository.toggleDailyMicroGoal(goalId, getTodayDateString())
+            GentleNotificationHelper.triggerGentleHaptic(context, isSuccess = isDone)
+            if (isDone) {
+                _gentleAffirmation.value = "Micro-goal achieved! Mindful habits build focus & joy."
+            }
         }
     }
 
@@ -692,6 +765,8 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
     fun startTimerForTask(task: PlannerTask, microStep: MicroStep? = null) {
         _activeFocusTask.value = task
         _activeFocusStep.value = microStep
+        _isBreakMode.value = false
+        _showTimerCompletionCue.value = false
         val mins = microStep?.durationMinutes ?: task.estimatedMinutes
         _timerDurationTotal.value = mins * 60
         _timerSecondsRemaining.value = mins * 60
@@ -701,6 +776,7 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
 
     fun startTimer() {
         if (_isTimerRunning.value) return
+        _showTimerCompletionCue.value = false
         _isTimerRunning.value = true
         timerJob?.cancel()
         timerJob = viewModelScope.launch {
@@ -710,6 +786,7 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
             }
             if (_timerSecondsRemaining.value <= 0 && _isTimerRunning.value) {
                 _isTimerRunning.value = false
+                _showTimerCompletionCue.value = true
                 onTimerCompleted()
             }
         }
@@ -724,12 +801,16 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
         if (_isTimerRunning.value) {
             pauseTimer()
         } else {
+            if (_timerSecondsRemaining.value <= 0) {
+                _timerSecondsRemaining.value = _timerDurationTotal.value
+            }
             startTimer()
         }
     }
 
     fun resetTimer() {
         pauseTimer()
+        _showTimerCompletionCue.value = false
         _timerSecondsRemaining.value = _timerDurationTotal.value
     }
 
@@ -737,13 +818,30 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
         val extraSeconds = minutes * 60
         _timerDurationTotal.value += extraSeconds
         _timerSecondsRemaining.value += extraSeconds
+        _showTimerCompletionCue.value = false
         GentleNotificationHelper.triggerGentleHaptic(context, isSuccess = false)
     }
 
-    fun setTimerPreset(minutes: Int) {
+    fun setTimerPreset(minutes: Int, isBreak: Boolean = false) {
         pauseTimer()
+        _isBreakMode.value = isBreak
+        _showTimerCompletionCue.value = false
         _timerDurationTotal.value = minutes * 60
         _timerSecondsRemaining.value = minutes * 60
+    }
+
+    fun startBreakTimer(minutes: Int) {
+        setTimerPreset(minutes, isBreak = true)
+        startTimer()
+    }
+
+    fun startFocusPreset(minutes: Int) {
+        setTimerPreset(minutes, isBreak = false)
+        startTimer()
+    }
+
+    fun dismissTimerCompletion() {
+        _showTimerCompletionCue.value = false
     }
 
     private fun onTimerCompleted() {

@@ -148,25 +148,43 @@ abstract class AppDatabase : RoomDatabase() {
 
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
-                val instance = Room.databaseBuilder(
-                    context.applicationContext,
-                    AppDatabase::class.java,
-                    "focusflow_planner_db"
-                )
-                    .fallbackToDestructiveMigration()
-                    .addCallback(object : Callback() {
-                        override fun onCreate(db: SupportSQLiteDatabase) {
-                            super.onCreate(db)
-                            // Populate initial seed data
-                            CoroutineScope(Dispatchers.IO).launch {
-                                getInstance(context).populateInitialSeedData()
+                INSTANCE ?: buildDatabase(context).also { INSTANCE = it }
+            }
+        }
+
+        private fun buildDatabase(context: Context): AppDatabase {
+            lateinit var instance: AppDatabase
+            instance = Room.databaseBuilder(
+                context.applicationContext,
+                AppDatabase::class.java,
+                "focusflow_planner_db"
+            )
+                .fallbackToDestructiveMigration()
+                .addCallback(object : Callback() {
+                    override fun onCreate(db: SupportSQLiteDatabase) {
+                        super.onCreate(db)
+                        CoroutineScope(Dispatchers.IO).launch {
+                            try {
+                                instance.populateInitialSeedData()
+                            } catch (e: Exception) {
+                                e.printStackTrace()
                             }
                         }
-                    })
-                    .build()
-                INSTANCE = instance
-                instance
-            }
+                    }
+
+                    override fun onDestructiveMigration(db: SupportSQLiteDatabase) {
+                        super.onDestructiveMigration(db)
+                        CoroutineScope(Dispatchers.IO).launch {
+                            try {
+                                instance.populateInitialSeedData()
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        }
+                    }
+                })
+                .build()
+            return instance
         }
     }
 

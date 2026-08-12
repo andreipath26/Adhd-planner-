@@ -62,6 +62,7 @@ fun TaskCard(
     onOpenDecomposition: () -> Unit,
     onSetSpotlight: () -> Unit,
     onDelete: () -> Unit,
+    onAiBreakdown: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val energyColor = when (task.energyRequired) {
@@ -209,7 +210,7 @@ fun TaskCard(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Substeps badge
+            // Substeps / AI Breakdown badge
             if (substepCount > 0) {
                 Box(
                     modifier = Modifier
@@ -217,33 +218,45 @@ fun TaskCard(
                         .background(ElegantDarkBorder)
                         .clickable { onOpenDecomposition() }
                         .padding(horizontal = 8.dp, vertical = 3.dp)
+                        .testTag("task_substeps_badge_${task.id}")
                 ) {
-                    Text(
-                        text = "$substepDoneCount/$substepCount micro-steps",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = if (substepDoneCount == substepCount) ElegantLavender else ElegantRose
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "$substepDoneCount/$substepCount micro-steps",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = if (substepDoneCount == substepCount) ElegantLavender else ElegantRose
+                        )
+                    }
                 }
             } else {
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
-                        .background(ElegantDarkBorder.copy(alpha = 0.5f))
-                        .clickable { onOpenDecomposition() }
-                        .padding(horizontal = 6.dp, vertical = 3.dp)
+                        .background(ElegantLavender.copy(alpha = 0.15f))
+                        .border(1.dp, ElegantLavender.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                        .clickable {
+                            if (onAiBreakdown != null) {
+                                onAiBreakdown.invoke()
+                            } else {
+                                onOpenDecomposition()
+                            }
+                        }
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                        .testTag("ai_breakdown_button_${task.id}")
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             imageVector = Icons.Default.AutoAwesome,
-                            contentDescription = null,
+                            contentDescription = "AI Breakdown",
                             tint = ElegantLavender,
-                            modifier = Modifier.size(12.dp)
+                            modifier = Modifier.size(13.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = "Decompose",
-                            fontSize = 10.sp,
+                            text = "AI Breakdown",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
                             color = ElegantLavender
                         )
                     }

@@ -2,8 +2,11 @@ package com.example.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -92,6 +95,8 @@ fun DashboardScreen(
     timerDurationTotal: Int,
     timerSecondsRemaining: Int,
     isTimerRunning: Boolean,
+    isBreakMode: Boolean = false,
+    showCompletionCue: Boolean = false,
     selectedDay: Int,
     pendingBrainDumps: List<BrainDumpItem>,
     pendingBrainDumpCount: Int,
@@ -101,6 +106,7 @@ fun DashboardScreen(
     onAddFiveMinutes: () -> Unit,
     onTimerPresetSelected: (Int) -> Unit,
     onEnterFocusMode: () -> Unit,
+    onStartBreak: ((Int) -> Unit)? = null,
     onOpenCustomizeDashboard: () -> Unit,
     onOpenDailyCheckIn: () -> Unit = {},
     onQuickBrainDump: (String) -> Unit,
@@ -115,9 +121,16 @@ fun DashboardScreen(
     onDeleteMicroStep: (MicroStep) -> Unit,
     onFocusStepSelected: (MicroStep) -> Unit,
     onSelectTask: (PlannerTask) -> Unit,
+    onToggleMicroGoal: ((String) -> Unit)? = null,
+    isFocusMode: Boolean = false,
+    isNotificationShieldActive: Boolean = true,
+    onToggleFocusMode: () -> Unit = {},
+    onOpenShieldWhitelist: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val visibleWidgets = widgets.filter { it.isVisible }.sortedBy { it.orderIndex }
+    val visibleWidgets = widgets.filter { widget ->
+        widget.isVisible && (!isFocusMode || widget.type == DashboardWidgetType.VISUAL_TIMER || widget.type == DashboardWidgetType.DAILY_INTENTION || widget.type == DashboardWidgetType.TASK_DECOMPOSITION)
+    }.sortedBy { it.orderIndex }
     val completedTodayCount = todayTasks.count { it.isCompleted }
     val totalTodayCount = todayTasks.size
 
@@ -140,19 +153,55 @@ fun DashboardScreen(
             ) {
                 Column {
                     Text(
-                        text = "Executive Hub",
+                        text = if (isFocusMode) "Focus Mode" else "Executive Hub",
                         fontSize = 22.sp,
                         fontWeight = FontWeight.Bold,
                         color = ElegantTextPrimary
                     )
                     Text(
-                        text = "$completedTodayCount of $totalTodayCount objectives complete today",
+                        text = if (isFocusMode) "Non-essential widgets hidden • Shield Active" else "$completedTodayCount of $totalTodayCount objectives complete today",
                         fontSize = 12.sp,
-                        color = ElegantTextSecondary
+                        color = if (isFocusMode) EnergyLowColor else ElegantTextSecondary
                     )
                 }
 
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    // Focus Mode Toggle Chip
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(
+                                if (isFocusMode) EnergyLowColor.copy(alpha = 0.2f)
+                                else ElegantDarkSurfaceVariant
+                            )
+                            .border(
+                                1.dp,
+                                if (isFocusMode) EnergyLowColor.copy(alpha = 0.6f)
+                                else ElegantDarkBorderSubtle,
+                                RoundedCornerShape(12.dp)
+                            )
+                            .clickable { onToggleFocusMode() }
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                            .testTag("dashboard_focus_mode_chip"),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = if (isFocusMode) Icons.Default.Security else Icons.Default.CenterFocusStrong,
+                                contentDescription = "Focus Mode Toggle",
+                                tint = if (isFocusMode) EnergyLowColor else ElegantLavender,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = if (isFocusMode) "Focus ON" else "Focus Mode",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isFocusMode) EnergyLowColor else ElegantTextPrimary
+                            )
+                        }
+                    }
+
                     // Daily Check-in Status Quick Chip
                     Box(
                         modifier = Modifier
@@ -211,6 +260,149 @@ fun DashboardScreen(
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = ElegantLavender
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Placeholder Notification Shield Overlay Card (Active when in Focus Mode or Shield enabled)
+        if (isFocusMode || isNotificationShieldActive) {
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(EnergyLowColor.copy(alpha = 0.12f))
+                        .border(1.dp, EnergyLowColor.copy(alpha = 0.4f), RoundedCornerShape(18.dp))
+                        .padding(14.dp)
+                        .testTag("notification_shield_overlay")
+                ) {
+                    Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(CircleShape)
+                                        .background(EnergyLowColor.copy(alpha = 0.25f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Security,
+                                        contentDescription = "Notification Shield",
+                                        tint = EnergyLowColor,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = "Notification Shield Active",
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = EnergyLowColor
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(6.dp))
+                                                .background(EnergyLowColor)
+                                                .padding(horizontal = 5.dp, vertical = 2.dp)
+                                        ) {
+                                            Text(
+                                                text = "RESTRICTED",
+                                                fontSize = 8.sp,
+                                                fontWeight = FontWeight.Black,
+                                                color = ElegantDarkBackground
+                                            )
+                                        }
+                                    }
+                                    Text(
+                                        text = if (isFocusMode) "System alerts restricted • Non-essential widgets hidden" else "System alerts restricted to VIP Whitelist",
+                                        fontSize = 11.sp,
+                                        color = ElegantTextSecondary
+                                    )
+                                }
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(ElegantDarkSurfaceVariant)
+                                    .border(1.dp, ElegantDarkBorderSubtle, RoundedCornerShape(10.dp))
+                                    .clickable { onOpenShieldWhitelist() }
+                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                                    .testTag("configure_shield_whitelist_btn"),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "Whitelist",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = ElegantLavender
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(ElegantDarkSurface)
+                                        .border(1.dp, ElegantDarkBorderSubtle, RoundedCornerShape(8.dp))
+                                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    Text(
+                                        text = "VIP Contacts: 2 Allowed",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = ElegantTextPrimary
+                                    )
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(ElegantDarkSurface)
+                                        .border(1.dp, ElegantDarkBorderSubtle, RoundedCornerShape(8.dp))
+                                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    Text(
+                                        text = "VIP Apps: 2 Allowed",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = ElegantTextPrimary
+                                    )
+                                }
+                            }
+
+                            Text(
+                                text = if (isFocusMode) "Exit Focus" else "Enable Focus",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = EnergyLowColor,
+                                modifier = Modifier
+                                    .clickable { onToggleFocusMode() }
+                                    .padding(4.dp)
                             )
                         }
                     }
@@ -318,7 +510,8 @@ fun DashboardScreen(
             DashboardWidgetType.DAILY_INTENTION -> {
                 DailyIntentionWidget(
                     todayCheckIn = todayCheckIn,
-                    onOpenCheckIn = onOpenDailyCheckIn
+                    onOpenCheckIn = onOpenDailyCheckIn,
+                    onToggleMicroGoal = onToggleMicroGoal
                 )
             }
 
@@ -339,7 +532,10 @@ fun DashboardScreen(
                     onReset = onResetTimer,
                     onAddFiveMinutes = onAddFiveMinutes,
                     onPresetSelected = onTimerPresetSelected,
-                    onToggleDistractionFree = onEnterFocusMode
+                    onToggleDistractionFree = onEnterFocusMode,
+                    isBreakMode = isBreakMode,
+                    showCompletionCue = showCompletionCue || (timerSecondsRemaining <= 0 && timerDurationTotal > 0),
+                    onStartBreak = onStartBreak
                 )
             }
 

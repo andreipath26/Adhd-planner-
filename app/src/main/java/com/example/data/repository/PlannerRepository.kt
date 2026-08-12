@@ -36,6 +36,27 @@ class PlannerRepository(private val db: AppDatabase) {
         return id
     }
 
+    suspend fun toggleDailyMicroGoal(goalId: String, date: String): Boolean {
+        val checkIn = db.dailyCheckInDao().getCheckInForDateSync(date) ?: return false
+        val updatedGoals = checkIn.microGoals.map { goal ->
+            if (goal.id == goalId) {
+                val isNowDone = !goal.isCompleted
+                goal.copy(
+                    isCompleted = isNowDone,
+                    completedAt = if (isNowDone) System.currentTimeMillis() else null
+                )
+            } else goal
+        }
+        val updatedCheckIn = checkIn.copy(microGoals = updatedGoals)
+        db.dailyCheckInDao().insertOrUpdate(updatedCheckIn)
+        val toggledGoal = updatedGoals.find { it.id == goalId }
+        val isDone = toggledGoal?.isCompleted == true
+        if (isDone) {
+            awardXp(15, 0) // Micro-goal mindfulness bonus!
+        }
+        return isDone
+    }
+
     fun getAllTasks(): Flow<List<PlannerTask>> = db.taskDao().getAllTasks()
 
     fun getTasksForDay(dayOfWeek: Int): Flow<List<PlannerTask>> = db.taskDao().getTasksForDay(dayOfWeek)
@@ -47,6 +68,8 @@ class PlannerRepository(private val db: AppDatabase) {
     fun getAllMicroSteps(): Flow<List<MicroStep>> = db.microStepDao().getAllMicroSteps()
 
     fun getUserProgress(): Flow<UserProgress?> = db.userProgressDao().getProgress()
+
+    suspend fun getUserProgressSync(): UserProgress? = db.userProgressDao().getProgressSync()
 
     fun getLeaderboardUsers(): Flow<List<LeaderboardUser>> = db.leaderboardDao().getAllLeaderboardUsers()
 
